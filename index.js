@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
@@ -12,16 +12,34 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@clu
 const client = new MongoClient(uri);
 
 async function run() {
-	const productsCollection = client
-		.db("emaJohnCollection")
-		.collection("products");
+	try {
+		const productsCollection = client
+			.db("emaJohnCollection")
+			.collection("products");
 
-	app.get("/products", async (req, res) => {
-		const query = {};
-		const result = productsCollection.find(query);
-		const data = await result.toArray();
-		res.send(data);
-	});
+		app.get("/products", async (req, res) => {
+			const page = parseInt(req.query.page);
+			const size = parseInt(req.query.size);
+
+			const query = {};
+			const cursor = productsCollection.find(query);
+			const products = await cursor
+				.skip(page * size)
+				.limit(size)
+				.toArray();
+			const count = await productsCollection.count();
+			res.send({ count, products });
+		});
+		app.post("/productsByIds", async (req, res) => {
+			const ids = req.body;
+			const objectId = ids.map(id => ObjectId(id));
+			const query = { _id: { $in: objectId } };
+			const cursor = productsCollection.find(query);
+			const products = await cursor.toArray();
+			res.send(products);
+		});
+	} finally {
+	}
 }
 run().catch(err => console.error(err));
 
